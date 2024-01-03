@@ -7,6 +7,8 @@ const port = process.env.PORT || 5000
 const app = express()
 
 app.use(express.static("public"))
+app.use(bodyParser.urlencoded({ extended: true }))
+app.use(bodyParser.json())
 
 let key = "ce9c5786e30b41948e4cf67f276b2e5e";
 let endpoint = "https://api.cognitive.microsofttranslator.com";
@@ -15,8 +17,7 @@ let location = "eastus";
 let client = new MongoClient(uri);
 
 // Middleware
-// app.use(bodyParser.urlencoded({ extended: true }))
-// app.use(bodyParser.json())
+
 
 
 // location, also known as region.
@@ -32,12 +33,14 @@ let client = new MongoClient(uri);
         
         let col = db.collection("translation") 
 
-        app.get("/", (req, res) => {
-            res.send("Server is running !")
+        app.get("/all", async (req, res) => {
+            let result = await col.find().toArray()
+            res.json(result)
         })
 
-        app.get('/translate', async (req, res) => {
+        app.post('/translate', async (req, res) => {
             try {
+                console.log(req.body)
 
                 let result = await axios({
                     baseURL: endpoint,
@@ -53,18 +56,25 @@ let client = new MongoClient(uri);
                     params: {
                         'api-version': '3.0',
                         'from': 'en',
-                        'to': 'fr'
+                        'to': req.body.langCode
                     },
                     data: [{
-                        'text': req.params.org_text
+                        'text': req.body.orgText
                     }],
                 })
 
-                // col.insertOne({
-                //     orgText: ,
-                //     transText: ,
-                //     langCode: "",
-                // })
+                let transText = result.data[0].translations[0].text
+                let langCode = result.data[0].translations[0].to
+
+                let feedback = await col.insertOne({
+                    orgText: req.body.orgText,
+                    transText,
+                    langCode
+                })
+
+                console.log("feedback", feedback)
+
+                console.log(result.data[0].translations[0].text)
 
                 res.json({ result: result.data })
             } catch (e) {
